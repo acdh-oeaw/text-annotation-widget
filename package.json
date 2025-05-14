@@ -1,6 +1,6 @@
 {
-  "name": "text-annotation-test",
-  "version": "0.0.2",
+  "name": "@acdh-oeaw/text-annotation-widget",
+  "version": "0.0.1",
   "type": "module",
   "main": "dist/text-annotation.iife.js",
   "module": "dist/text-annotation.iife.js",
