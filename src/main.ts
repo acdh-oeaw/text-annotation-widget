@@ -3,8 +3,9 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 
 import { createApp, ref } from 'vue'
 
-import ProseMirrorEditor from './components/prose-mirror-editor.vue'
 import type { Entity } from '@/types.ts'
+
+import ProseMirrorEditor from './components/prose-mirror-editor.vue'
 
 const sampleData = [{ id: 1, name: 'Church' }];
 

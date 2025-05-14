@@ -71,8 +71,8 @@ export const keyBoardPlugins = {
           const atEnd = $from.parentOffset === $from.parent.content.size
 
           const tr = atEnd
-            ? state.tr.insert($from.pos, state.schema.nodes.hard_break!.create())
-            : state.tr.replaceSelectionWith(state.schema.nodes.hard_break!.create())
+            ? state.tr.insert($from.pos, state.schema.nodes.hard_break.create())
+            : state.tr.replaceSelectionWith(state.schema.nodes.hard_break.create())
 
           dispatch(tr.scrollIntoView())
         }
