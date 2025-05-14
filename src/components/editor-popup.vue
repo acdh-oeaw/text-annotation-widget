@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import '../assets/editor-pop-up.css'
-import { watch } from 'vue'
 
-import { ref } from 'vue'
+import { ref,watch  } from 'vue';
+
 import type { Annotation, Entity } from '../types'
 
 // Props for linked entities
@@ -21,14 +21,14 @@ const currentEditAnnotation = ref<Annotation | undefined>(undefined)
 
 watch(
   () => props.triggerAnnotation,
-  (newVal) => {
+  (newVal: boolean) => {
     dialogOpen.value = newVal
   },
 )
 
 watch(
   () => props.annotation,
-  (newVal) => {
+  (newVal: Annotation | undefined) => {
     currentEditAnnotation.value = newVal
     if (currentEditAnnotation.value) {
       entityId.value = currentEditAnnotation.value.entityId
@@ -38,7 +38,7 @@ watch(
 )
 
 watch([entityId, comment], () => {
-  addDisabled.value = !(entityId.value != null || comment.value != '')
+  addDisabled.value = !(entityId.value != null || comment.value !== '')
 })
 
 const handleAdd = () => {
@@ -68,7 +68,7 @@ const handleEdit = () => {
 </script>
 
 <template>
-  <div v-if="dialogOpen" class="modal d-block" tabindex="-1" role="dialog">
+  <div v-if="dialogOpen" class="modal d-block" role="dialog" tabindex="-1">
     <div class="modal-dialog" role="document">
       <div class="modal-content">
         <div class="modal-header">
@@ -76,16 +76,16 @@ const handleEdit = () => {
             {{ props.annotation ? 'Edit Annotation' : 'Add Annotation' }}
           </h5>
           <button
-            type="button"
-            class="btn-close"
             aria-label="Close"
+            class="btn-close"
+            type="button"
             @click="handleCancel()"
           ></button>
         </div>
 
         <div class="modal-body">
           <div class="mb-3">
-            <label for="linked-entities" class="form-label">Linked Entities</label>
+            <label class="form-label" for="linked-entities">Linked Entities</label>
             <select id="linked-entities" v-model="entityId" class="form-select" required>
               <option disabled value="">Link an entity</option>
               <option v-for="entity in props.entities" :key="entity.id" :value="entity.id">
@@ -95,34 +95,34 @@ const handleEdit = () => {
           </div>
 
           <div class="mb-3">
-            <label for="comment" class="form-label">Comment</label>
+            <label class="form-label" for="comment">Comment</label>
             <textarea
               id="comment"
               v-model="comment"
               class="form-control"
-              rows="4"
               placeholder="Add comment"
+              rows="4"
             ></textarea>
           </div>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="handleCancel()">Cancel</button>
+          <button class="btn btn-secondary" type="button" @click="handleCancel()">Cancel</button>
           <button
             v-if="!currentEditAnnotation"
-            type="button"
-            :disabled="addDisabled"
-            @click="handleAdd()"
             class="btn btn-primary"
+            :disabled="addDisabled"
+            type="button"
+            @click="handleAdd()"
           >
             Add
           </button>
           <button
             v-else
-            type="button"
-            :disabled="addDisabled"
-            @click="handleEdit()"
             class="btn btn-primary"
+            :disabled="addDisabled"
+            type="button"
+            @click="handleEdit()"
           >
             Edit
           </button>
@@ -130,5 +130,5 @@ const handleEdit = () => {
       </div>
     </div>
   </div>
-  <div class="modal-backdrop fade" :class="{ show: dialogOpen }" v-if="dialogOpen"></div>
+  <div v-if="dialogOpen" class="modal-backdrop fade" :class="{ show: dialogOpen }"></div>
 </template>

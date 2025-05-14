@@ -1,9 +1,8 @@
-import { Schema, type NodeSpec, type MarkSpec } from 'prosemirror-model'
-import { schema as basicSchema } from 'prosemirror-schema-basic'
-import { undo, redo } from 'prosemirror-history'
+import { history,redo,undo  } from 'prosemirror-history'
 import { keymap } from 'prosemirror-keymap'
-import { history } from 'prosemirror-history'
-import type { EditorView } from 'prosemirror-view'
+import { type MarkSpec,type NodeSpec, Schema } from 'prosemirror-model'
+import { schema as basicSchema } from 'prosemirror-schema-basic'
+
 
 // Define custom annotation mark (MarkSpec)
 const annotationMark: MarkSpec = {
@@ -11,6 +10,7 @@ const annotationMark: MarkSpec = {
     meta: { default: null },
   },
   toDOM: (mark) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     return ['mark', { meta: mark.attrs.meta }, 0]
   },
   parseDOM: [
@@ -25,12 +25,12 @@ const annotationMark: MarkSpec = {
 }
 
 // Convert marks to plain objects
-const marks: { [key: string]: MarkSpec } = {
-  ...basicSchema.spec.marks,
+const marks = {
+  ...basicSchema.spec.marks.toObject(),
   annotation: annotationMark,
 }
 
-const nodes: { [key: string]: NodeSpec } = {
+const nodes: Record<string, NodeSpec> = {
   doc: { content: 'block+' },
   paragraph: {
     ...basicSchema.spec.nodes.get('paragraph'),
@@ -71,8 +71,8 @@ export const keyBoardPlugins = {
           const atEnd = $from.parentOffset === $from.parent.content.size
 
           const tr = atEnd
-            ? state.tr.insert($from.pos, state.schema.nodes.hard_break.create())
-            : state.tr.replaceSelectionWith(state.schema.nodes.hard_break.create())
+            ? state.tr.insert($from.pos, state.schema.nodes.hard_break!.create())
+            : state.tr.replaceSelectionWith(state.schema.nodes.hard_break!.create())
 
           dispatch(tr.scrollIntoView())
         }

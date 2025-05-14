@@ -1,12 +1,18 @@
-import { createApp, ref } from 'vue'
-import ProseMirrorEditor from './components/prose-mirror-editor.vue'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 
-createTextAnnotationApp({ linkedEntities: [{ id: 1, name: 'Church' }], sourceText: '' })
+import { createApp, ref } from 'vue'
 
-export function createTextAnnotationApp({ linkedEntities = [], sourceText = '' }) {
+import ProseMirrorEditor from './components/prose-mirror-editor.vue'
+import type { Entity } from '@/types.ts'
+
+const sampleData = [{ id: 1, name: 'Church' }];
+
+createTextAnnotationApp({ linkedEntities: sampleData, sourceText: '' })
+
+export function createTextAnnotationApp({ linkedEntities = [], sourceText = '' }: { linkedEntities: Array<Entity>; sourceText: string }) {
   const app = createApp({
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     components: { ProseMirrorEditor },
     setup() {
       const linkedEntitiesRef = ref(linkedEntities)

@@ -1,12 +1,23 @@
-<script lang="ts">
-import { type MenuItem } from '../types'
+<script lang="ts" setup>
+import '../assets/editor.css'
+
+import { PencilIcon, Trash2Icon } from 'lucide-vue-next'
+import  { DOMParser as ProseMirrorDOMParser,type Mark,type Node  } from 'prosemirror-model'
+import { EditorState , Plugin } from 'prosemirror-state'
+import { EditorView } from 'prosemirror-view'
+import { computed,nextTick, onMounted, ref, toRaw } from 'vue'
+
+import { keyBoardPlugins,schema } from '@/schema'
+import type { Annotation,Entity, MenuItem  } from '@/types'
+
+import EditorPopup from './editor-popup.vue'
 
 const MenuView = class {
-  items: MenuItem[]
+  items: Array<MenuItem>
   editorView: EditorView
   dom: HTMLElement
 
-  constructor(items: MenuItem[], editorView: EditorView) {
+  constructor(items: Array<MenuItem>, editorView: EditorView) {
     this.items = items
     this.editorView = editorView
 
@@ -24,20 +35,6 @@ const MenuView = class {
     })
   }
 }
-</script>
-
-<script lang="ts" setup>
-import { EditorState } from 'prosemirror-state'
-import { EditorView } from 'prosemirror-view'
-import { DOMParser as ProseMirrorDOMParser } from 'prosemirror-model'
-import { onMounted, ref, toRaw, nextTick, computed } from 'vue'
-import { PencilIcon, Trash2Icon } from 'lucide-vue-next'
-import { schema, keyBoardPlugins } from '../schema'
-import { Plugin } from 'prosemirror-state'
-import { Transaction } from 'prosemirror-state'
-import { type Entity, type Annotation } from '../types'
-import EditorPopup from './editor-popup.vue'
-import '../assets/editor.css'
 
 const props = defineProps<{
   linkedEntities: Array<Entity>
@@ -62,11 +59,11 @@ const sortedAnnotations = computed(() => {
 })
 
 // Make a custom menu
-const menuPlugin = (items: MenuItem[]) => {
+const menuPlugin = (items: Array<MenuItem>) => {
   return new Plugin({
+    //@ts-expect-error editorView interface needs to be refactored
     view(editorView) {
       const menuView = new MenuView(items, editorView)
-      console.log('MenuView: ', menuView)
       if (editorView.dom.parentNode != null) {
         editorView.dom.parentNode.insertBefore(menuView.dom, editorView.dom)
       }
@@ -76,7 +73,7 @@ const menuPlugin = (items: MenuItem[]) => {
 }
 
 const annotateButton = {
-  command: (state: EditorState, dispatch: (tr: Transaction) => void, view: EditorView) => {
+  command: (state: EditorState) => {
     const { from, to } = state.selection
     selectionRange.value = { from, to }
 
@@ -90,7 +87,6 @@ const annotateButton = {
     state.doc.nodesBetween(from, to, (node) => {
       if (node.marks.some((mark) => mark.type === schema.marks.annotation)) {
         overlapping = true
-        return false
       }
     })
 
@@ -108,7 +104,7 @@ const annotateButton = {
 
 function icon(text: string, name: string) {
   const span = document.createElement('span')
-  span.className = 'menuicon ' + name
+  span.className = `menuicon ${  name}`
   span.title = name
   span.textContent = text
   span.style.cursor = 'pointer'
@@ -145,7 +141,7 @@ const handleAddAnnotation = ({
       comment,
     })
 
-    const tr = state.tr.addMark(from, to, schema.marks.annotation.create({ meta }))
+    const tr = state.tr.addMark(from, to, schema.marks.annotation!.create({ meta }))
 
     annotations.value.push({
       id: annotationId,
@@ -162,8 +158,6 @@ const handleAddAnnotation = ({
   } catch (error) {
     handleError(`Add annotation: ${error}`)
   }
-
-  console.log(annotations.value)
 }
 
 const handleCancelAnnotation = () => {
@@ -213,12 +207,12 @@ const handleEditAnnotation = (updatedAnnotation: { entityId: string; comment: st
   }
 }
 
-const updateEditorAnnotation = (annotation: any) => {
+const updateEditorAnnotation = (annotation: Annotation) => {
   if (editorView.value === null) return
 
   const state = toRaw(editorView.value.state)
 
-  const mark = schema.marks.annotation.create({
+  const mark = schema.marks.annotation!.create({
     meta: JSON.stringify({
       annotationId: annotation.id,
       entityId: annotation.entityId,
@@ -253,12 +247,12 @@ const removeAnnotation = (annotationId: string) => {
   annotations.value = annotations.value.filter((annotation) => annotation.id !== annotationId)
 }
 
-const extractAnnotations = (doc: any) => {
+const extractAnnotations = (doc: Node) => {
   const extractedAnnotations: Array<Annotation> = []
 
-  doc.descendants((node: any, pos: number) => {
+  doc.descendants((node: Node, pos: number) => {
     if (node.marks) {
-      node.marks.forEach((mark: any) => {
+      node.marks.forEach((mark: Mark) => {
         if (mark.type === schema.marks.annotation) {
           try {
             const meta = JSON.parse(mark.attrs.meta)
@@ -309,8 +303,6 @@ const updateAnnotationPositions = (view: EditorView) => {
       })
     }
   })
-
-  console.log(updatedAnnotations)
   annotations.value = updatedAnnotations
 }
 
@@ -372,7 +364,7 @@ const handleError = (message: string) => {
 
     <h2 class="y-4 fs-6 fw-bold">Annotations</h2>
 
-    <div class="pb-2" v-if="sortedAnnotations.length > 0">
+    <div v-if="sortedAnnotations.length > 0" class="pb-2">
       <ul class="list-unstyled mt-2">
         <li
           v-for="annotation in sortedAnnotations"
@@ -394,15 +386,15 @@ const handleError = (message: string) => {
           </div>
           <div class="d-flex align-items-center gap-2">
             <button
-              type="button"
               class="button-hover d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 p-2 text-primary transition"
+              type="button"
               @click="editAnnotation(annotation.id)"
             >
               <PencilIcon :size="16" />
             </button>
             <button
-              type="button"
               class="button-hover d-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 p-2 text-danger transition"
+              type="button"
               @click="removeAnnotation(annotation.id)"
             >
               <Trash2Icon :size="16" />
@@ -416,11 +408,11 @@ const handleError = (message: string) => {
 
     <div>
       <EditorPopup
+        :annotation="currentEditAnnotation ?? undefined"
+        :entities="props.linkedEntities"
+        :trigger-annotation="annotationSelected"
         @add-annotation="handleAddAnnotation"
         @cancel-annotation="handleCancelAnnotation"
-        :triggerAnnotation="annotationSelected"
-        :entities="props.linkedEntities"
-        :annotation="currentEditAnnotation ?? undefined"
         @edit-annotation="handleEditAnnotation"
       />
     </div>
