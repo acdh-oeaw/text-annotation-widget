@@ -1,4 +1,7 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": ["@acdh-oeaw/tsconfig"],
+  "include": [],
   "files": [],
   "references": [
     {
@@ -14,7 +17,7 @@
       "@/*": ["./src/*"]
     },
     // @see https://github.com/microsoft/TypeScript/issues/58975
-    "module": "esnext",
-    "esModuleInterop": true
+    "module": "ESNext",
+    "esModuleInterop": true,
   }
 }
