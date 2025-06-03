@@ -32,12 +32,16 @@ import { EditorView } from 'prosemirror-view'
 import { DOMParser as ProseMirrorDOMParser } from 'prosemirror-model'
 import { onMounted, ref, toRaw, nextTick, computed } from 'vue'
 import { PencilIcon, Trash2Icon } from 'lucide-vue-next'
-import { schema, keyBoardPlugins } from '../schema'
+import { schema, keyBoardPlugins, createPreventLineBreakPlugin, createPasteNormalizerPlugin } from '../schema'
 import { Plugin } from 'prosemirror-state'
 import { Transaction } from 'prosemirror-state'
 import { type Entity, type Annotation } from '../types'
 import EditorPopup from './editor-popup.vue'
 import '../assets/editor.css'
+import { useErrorHandler } from '@/composables/use-handle-error'
+
+const { handleError, errorMessage, errorOccured } = useErrorHandler()
+const preventLineBreakInAnnotationsPlugin = createPreventLineBreakPlugin(handleError)
 
 const props = defineProps<{
   linkedEntities: Array<Entity>
@@ -48,8 +52,6 @@ const editorRef = ref<HTMLDivElement | null>(null)
 const editorView = ref<EditorView | null>(null)
 const annotationSelected = ref(false)
 const selectionRange = ref<{ from: number; to: number } | null>(null)
-const errorMessage = ref('')
-const errorOccured = ref(false)
 
 const annotations = ref<Array<Annotation>>([])
 
@@ -75,6 +77,24 @@ const menuPlugin = (items: MenuItem[]) => {
   })
 }
 
+function containsLineBreak(state: EditorState, from: number, to: number): boolean {
+  let hasBreak = false
+  const blockStart = state.doc.resolve(from).blockRange(state.doc.resolve(to))
+
+  state.doc.nodesBetween(from, to, (node) => {
+    if (node.type.name === 'hard_break') {
+      hasBreak = true
+      return false
+    }
+  })
+
+  if (blockStart == null) {
+    hasBreak = true
+  }
+
+  return hasBreak
+}
+
 const annotateButton = {
   command: (state: EditorState, dispatch: (tr: Transaction) => void, view: EditorView) => {
     const { from, to } = state.selection
@@ -96,6 +116,11 @@ const annotateButton = {
 
     if (overlapping) {
       handleError('Cannot add annotation: Overlapping annotation detected.')
+      return false
+    }
+
+    if (containsLineBreak(state, from, to)) {
+      handleError('Annotations across line breaks are not allowed.')
       return false
     }
 
@@ -218,6 +243,11 @@ const updateEditorAnnotation = (annotation: any) => {
 
   const state = toRaw(editorView.value.state)
 
+  if (containsLineBreak(state as EditorState, annotation.from, annotation.to)) {
+    handleError('Editing across line breaks is not allowed.')
+    return;
+  }
+
   const mark = schema.marks.annotation.create({
     meta: JSON.stringify({
       annotationId: annotation.id,
@@ -326,9 +356,10 @@ onMounted(async () => {
     doc: doc,
     plugins: [
       menuPlugin([annotateButton]),
+      ...preventLineBreakInAnnotationsPlugin,
+      createPasteNormalizerPlugin(schema),
       keyBoardPlugins.historyPlugin,
       keyBoardPlugins.undoRedoKeymap,
-      keyBoardPlugins.enterKeymap,
       keyBoardPlugins.backspaceKeymap,
       new Plugin({
         view(view) {
@@ -350,16 +381,6 @@ onMounted(async () => {
     extractAnnotations(doc)
   }
 })
-
-const handleError = (message: string) => {
-  errorMessage.value = message
-  errorOccured.value = true
-
-  setTimeout(() => {
-    errorOccured.value = false
-    errorMessage.value = ''
-  }, 5000)
-}
 </script>
 
 <template>
