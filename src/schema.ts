@@ -1,11 +1,11 @@
-import { Schema, type NodeSpec, type MarkSpec } from 'prosemirror-model'
+import { Schema, type NodeSpec, type MarkSpec, MarkType, Node as ProseMirrorNode } from 'prosemirror-model'
 import { Slice, Fragment } from 'prosemirror-model'
 import { schema as basicSchema } from 'prosemirror-schema-basic'
 import { undo, redo } from 'prosemirror-history'
 import { keymap } from 'prosemirror-keymap'
 import { history } from 'prosemirror-history'
 
-import { Plugin as PMPlugin, PluginKey } from 'prosemirror-state'
+import { Plugin as PMPlugin, PluginKey, Selection } from 'prosemirror-state'
 
 // Define custom annotation mark (MarkSpec)
 const annotationMark: MarkSpec = {
@@ -168,43 +168,235 @@ export function createPreventLineBreakPlugin(onError: (msg: string) => void) {
   ]
 }
 
-export function createPasteNormalizerPlugin(schema: Schema) {
+export function createPasteNormalizerPlugin(schema: Schema, onError?: (msg: string) => void) {
   return new PMPlugin({
     key: new PluginKey('normalizePaste'),
     props: {
       handlePaste(view, event, slice) {
-        const lines: string[] = []
+        const { state } = view;
+        const { selection, doc } = state;
+        const pos = selection.from;
+        const $pos = doc.resolve(pos);
+        const annotationMarkType = schema.marks.annotation;
 
-        // Combine all block content into lines
-        slice.content.forEach(node => {
-          if (node.isBlock) {
-            lines.push(...node.textContent.split(/\r?\n/).map(l => l.trim()))
-          } else {
-            lines.push(node.textContent.trim())
+        const insideAnnotation = $pos.marks().some(mark => mark.type === annotationMarkType);
+        if (insideAnnotation) {
+          if (onError) {
+            onError("Pasting Text inside an annotation is not allowed. \n Enter it manually by keyboard.");
           }
-        })
+          return true; 
+        }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const children: any[] = []
+        const text = slice.content.textBetween(0, slice.content.size, '\n');
+        const lines = text.split(/\r?\n/);
 
-        lines.forEach((line, idx) => {
+        const nodes: Array<ProseMirrorNode> = [];
+
+        lines.forEach((line, index) => {
           if (line) {
-            children.push(schema.text(line))
+            nodes.push(schema.text(line, []));
           }
-          if (idx < lines.length - 1) {
-            children.push(schema.nodes.hard_break.create())
+          if (index < lines.length - 1) {
+            nodes.push(schema.nodes.hard_break.create());
           }
-        })
+        });
 
-        const paragraph = schema.nodes.paragraph.create(null, Fragment.from(children))
-        const newSlice = new Slice(Fragment.from(paragraph), 0, 0)
+        const fragment = Fragment.fromArray(nodes);
+        const newSlice = new Slice(fragment, 0, 0);
+        const tr = state.tr.replaceSelection(newSlice).scrollIntoView();
 
-        const tr = view.state.tr.replaceSelection(newSlice)
-        view.dispatch(tr)
-
-        return true
+        view.dispatch(tr);
+        return true;
       },
     },
+  });
+}
+
+
+export function createAnnotationClickEdgePlugin() {
+  return new PMPlugin({
+    key: new PluginKey('annotationClickEdge'),
+    props: {
+      handleClick(view, pos) {
+        const { state, dispatch } = view
+        const doc = state.doc
+        const annotationMarkType = schema.marks.annotation
+        const $pos = doc.resolve(pos)
+
+        if (!$pos.marks().some(mark => mark.type === annotationMarkType)) {
+          return false
+        }
+
+        if (!$pos.marks().some(mark => mark.type === annotationMarkType)) {
+          const parent = $pos.parent;
+          const offset = $pos.parentOffset;
+
+          if (offset < parent.content.size) {
+            const nextNode = parent.child(offset);
+            if (nextNode.type.name === 'hard_break') {
+              const tr = state.tr.insert(pos, schema.text(' '));
+              dispatch(tr);
+              return true;
+            }
+          }
+
+          if (pos === 0) {
+            const tr = state.tr.insert(0, schema.text(' '));
+            dispatch(tr);
+            return true;
+          }
+
+          if (pos === doc.content.size) {
+            const tr = state.tr.insert(doc.content.size, schema.text(' '));
+            dispatch(tr);
+            return true;
+          }
+          return false;
+        }
+
+        const { start, end } = getMarkRange(doc, pos, annotationMarkType)
+
+        const currentSelectionPos = state.selection.from
+
+        if (pos === start) {
+          if (pos !== currentSelectionPos) {
+            const $newPos = doc.resolve(pos - 1 < 0 ? 0 : pos - 1)
+            const tr = state.tr.setSelection(Selection.near($newPos))
+            dispatch(tr)
+            return true
+          }
+        }
+
+        if (pos === end) {
+          const $pos = doc.resolve(pos);
+          const node = $pos.parent;
+          const offset = $pos.parentOffset;
+        
+          const child = node.childAfter(offset);
+          const afterNode = child.node;
+        
+          const annotationMark = annotationMarkType;
+        
+          if (afterNode && afterNode.marks.some(mark => mark.type === annotationMark)) {
+            const tr = state.tr;
+        
+            tr.split(pos);
+      
+            const $newPos = tr.doc.resolve(pos + 1); 
+            tr.setSelection(Selection.near($newPos, -1)).setStoredMarks([]);
+            dispatch(tr);
+            return true;
+          } else {
+            const $newPos = doc.resolve(pos);
+            const tr = state.tr.setSelection(Selection.near($newPos, -1)).setStoredMarks([]);
+            dispatch(tr);
+            return true;
+          }
+        }
+
+
+      }}
   })
+}
+
+export function createAnnotationArrowKeyPlugin(schema: Schema) {
+  return new PMPlugin({
+    key: new PluginKey('annotationArrowKey'),
+    props: {
+      handleKeyDown(view, event) {
+        const { state, dispatch } = view;
+        const { selection, doc } = state;
+        const annotationMarkType = schema.marks.annotation;
+
+        const { from, empty } = selection;
+        if (!empty) return false;
+
+        const pos = from;
+        const $pos = doc.resolve(pos);
+
+        const insideAnnotation = $pos.marks().some(m => m.type === annotationMarkType)
+          || ($pos.nodeBefore && $pos.nodeBefore.marks.some(m => m.type === annotationMarkType));
+        if (!insideAnnotation) return false;
+
+        const { start, end } = getMarkRange(doc, pos, annotationMarkType);
+
+        if (event.key === 'ArrowRight') {
+  
+          if (pos < end) {
+            event.preventDefault();
+            const tr = state.tr.setSelection(
+              Selection.near(doc.resolve(pos + 1), -1)
+            ).setStoredMarks([]);
+            dispatch(tr);
+            return true;
+          }
+
+          if (pos === end) {
+            const node = $pos.parent;
+            const offset = $pos.parentOffset;
+            const child = node.childAfter(offset);
+            const afterNode = child.node;
+
+            if (afterNode && afterNode.marks.some(mark => mark.type === annotationMarkType)) {
+              let tr = state.tr.split(pos);
+              event.preventDefault();
+              const $newPos = tr.doc.resolve(pos + 1);
+              tr = tr.setSelection(Selection.near($newPos, -1)).setStoredMarks([]);
+              dispatch(tr);
+              return true;
+            } else {
+              event.preventDefault();
+              const $newPos = doc.resolve(pos + 1);
+              const tr = state.tr.setSelection(Selection.near($newPos, -1)).setStoredMarks([]);
+              dispatch(tr);
+              return true;
+            }
+          }
+          return false;
+        }
+
+        if (event.key === 'ArrowLeft') {
+          if (pos === start) {
+            event.preventDefault();
+            const newPos = pos - 1 < 0 ? 0 : pos - 1;
+            const $newPos = doc.resolve(newPos);
+            const tr = state.tr.setSelection(Selection.near($newPos, 1)).setStoredMarks([]);
+            dispatch(tr);
+            return true;
+          }
+          if (pos > start) {
+            return false;
+          }
+        }
+        return false;
+      }
+    }
+  });
+}
+
+function getMarkRange(doc: ProseMirrorNode, pos: number, markType: MarkType) {
+  let start = pos;
+  let end = pos;
+
+  console.log(doc, pos, markType)
+  while (start > 0) {
+    const $start = doc.resolve(start - 1)
+    if (!$start.marks().some(mark => mark.type === markType)) break
+    start--
+  }
+
+  console.log(doc.resolve(end))
+  while (end < doc.content.size) {
+    const $end = doc.resolve(end)
+    if (!$end.marks().some(mark => mark.type === markType)) {
+      break
+    }
+    end++
+  }
+
+  end--;
+  console.log("start: ", start, "end: ", end)
+
+  return { start, end }
 }
 

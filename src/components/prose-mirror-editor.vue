@@ -32,7 +32,7 @@ import { EditorView } from 'prosemirror-view'
 import { DOMParser as ProseMirrorDOMParser } from 'prosemirror-model'
 import { onMounted, ref, toRaw, nextTick, computed } from 'vue'
 import { PencilIcon, Trash2Icon } from 'lucide-vue-next'
-import { schema, keyBoardPlugins, createPreventLineBreakPlugin, createPasteNormalizerPlugin } from '../schema'
+import { schema, keyBoardPlugins, createPreventLineBreakPlugin, createPasteNormalizerPlugin, createAnnotationClickEdgePlugin, createAnnotationArrowKeyPlugin } from '../schema'
 import { Plugin } from 'prosemirror-state'
 import { Transaction } from 'prosemirror-state'
 import { type Entity, type Annotation } from '../types'
@@ -42,6 +42,9 @@ import { useErrorHandler } from '@/composables/use-handle-error'
 
 const { handleError, errorMessage, errorOccured } = useErrorHandler()
 const preventLineBreakInAnnotationsPlugin = createPreventLineBreakPlugin(handleError)
+const handleAnnotationEdgePlugin = createAnnotationClickEdgePlugin()
+const handleArrowKeys = createAnnotationArrowKeyPlugin(schema);
+const handlePastingPlugin = createPasteNormalizerPlugin(schema, handleError);
 
 const props = defineProps<{
   linkedEntities: Array<Entity>
@@ -340,7 +343,6 @@ const updateAnnotationPositions = (view: EditorView) => {
     }
   })
 
-  console.log(updatedAnnotations)
   annotations.value = updatedAnnotations
 }
 
@@ -356,8 +358,10 @@ onMounted(async () => {
     doc: doc,
     plugins: [
       menuPlugin([annotateButton]),
+      handleArrowKeys,
       ...preventLineBreakInAnnotationsPlugin,
-      createPasteNormalizerPlugin(schema),
+      handlePastingPlugin,
+      handleAnnotationEdgePlugin,
       keyBoardPlugins.historyPlugin,
       keyBoardPlugins.undoRedoKeymap,
       keyBoardPlugins.backspaceKeymap,

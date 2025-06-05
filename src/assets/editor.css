@@ -32,6 +32,7 @@ mark {
   color: #1d3b1a;
   border-radius: 4px;
   padding: 0 4px;
+  margin-right: 0.5px;
 }
 
 mark:hover {
