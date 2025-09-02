@@ -70,7 +70,7 @@ mark:hover {
   transform: scale(0.95);
 }
 
-button {
+#text-annotation button {
   background-color: transparent;
   border: none;
   outline: none;
@@ -78,11 +78,11 @@ button {
   transition: background-color 0.2s ease;
 }
 
-button:hover {
+#text-annotation button:hover {
   background-color: rgba(0, 0, 0, 0.1);
 }
 
-button:focus {
+#text-annotation button:focus {
   outline: 2px solid #3b82f6; /* Blue focus ring */
 }
 
@@ -111,9 +111,10 @@ button:focus {
   background-color: #555;
 }
 
-input[type='text'],
-input[type='number'],
-textarea {
+
+#text-annotation input[type='text'],
+#text-annotation input[type='number'],
+#text-annotation textarea {
   padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid #ddd;
@@ -123,17 +124,17 @@ textarea {
   transition: border-color 0.2s ease;
 }
 
-input[type='text']:focus,
-textarea:focus {
+#text-annotation input[type='text']:focus,
+#text-annotation textarea:focus {
   border-color: #3b82f6;
   outline: none;
 }
 
-button:disabled {
+#text-annotation button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
 
-.button-hover:hover {
+#text-annotation .button-hover:hover {
   opacity: 0.8;
 }

@@ -300,7 +300,7 @@ const extractAnnotations = (doc: any) => {
               annotationText: doc.textBetween(pos, pos + node.nodeSize, ' '),
               from: pos,
               to: pos + node.nodeSize,
-              entityId: meta.id,
+              entityId: meta.entityId,
               comment: meta.comment,
             })
           } catch (error) {
@@ -388,7 +388,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
+  <div id="text-annotation">
     <div id="editor" ref="editorRef" class="border p-3 mb-3"></div>
 
     <div v-if="errorOccured" class="text-danger d-flex">
